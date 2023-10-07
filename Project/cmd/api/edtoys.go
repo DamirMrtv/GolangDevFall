@@ -2,12 +2,38 @@ package main
 
 import (
 	"Project/internal/data"
+	"Project/internal/validator" // New import
 	"fmt"
 	"net/http"
 )
 
 func (app *application) createEdtoysHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "create a new edtoys")
+	var input struct {
+		Title   string       `json:"title"`
+		Year    int32        `json:"year"`
+		Runtime data.Runtime `json:"runtime"`
+		Genres  []string     `json:"genres"`
+	}
+	err := app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+	edtoys := &data.Edtoys{
+		Title:   input.Title,
+		Year:    input.Year,
+		Runtime: input.Runtime,
+		Genres:  input.Genres,
+	}
+	// Initialize a new Validator.
+	v := validator.New()
+	// Call the ValidateMovie() function and return a response containing the errors if
+	// any of the checks fail.
+	if data.ValidateMovie(v, edtoys); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+	fmt.Fprintf(w, "%+v\n", input)
 }
 
 func (app *application) showEdtoysHandler(w http.ResponseWriter, r *http.Request) {
