@@ -1,0 +1,3 @@
+ALTER TABLE edToys DROP CONSTRAINT IF EXISTS edToys_runtime_check;
+ALTER TABLE edToys DROP CONSTRAINT IF EXISTS edToys_year_check;
+ALTER TABLE edToys DROP CONSTRAINT IF EXISTS genres_length_check;
