@@ -93,12 +93,12 @@ func (app *application) updateEdToysHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var input struct {
-		Title      string       `json:"title"`
-		Year       int32        `json:"year"`
-		TargetAge  string       `json:"target_age"`
-		Genres     []string     `json:"genres"`
-		SkillFocus []string     `json:"skill_focus"`
-		Runtime    data.Runtime `json:"runtime"`
+		Title      *string       `json:"title"`
+		Year       *int32        `json:"year"`
+		TargetAge  *string       `json:"target_age"`
+		Genres     []string      `json:"genres"`
+		SkillFocus []string      `json:"skill_focus"`
+		Runtime    *data.Runtime `json:"runtime"`
 	}
 	// Read the JSON request body data into the input struct.
 	err = app.readJSON(w, r, &input)
@@ -108,10 +108,24 @@ func (app *application) updateEdToysHandler(w http.ResponseWriter, r *http.Reque
 	}
 	// Copy the values from the request body to the appropriate fields of the movie
 	// record.
-	edToys.Title = input.Title
-	edToys.Year = input.Year
-	edToys.Runtime = input.Runtime
-	edToys.Genres = input.Genres
+	if input.Title != nil {
+		edToys.Title = *input.Title
+	}
+	if input.Year != nil {
+		edToys.Year = *input.Year
+	}
+	if input.TargetAge != nil {
+		edToys.TargetAge = *input.TargetAge
+	}
+	if input.Genres != nil {
+		edToys.Genres = input.Genres // Note that we don't need to dereference a slice.
+	}
+	if input.SkillFocus != nil {
+		edToys.SkillFocus = input.SkillFocus
+	}
+	if input.Runtime != nil {
+		edToys.Runtime = *input.Runtime
+	}
 	// Validate the updated movie record, sending the client a 422 Unprocessable Entity
 	// response if any checks fail.
 	v := validator.New()
@@ -122,9 +136,15 @@ func (app *application) updateEdToysHandler(w http.ResponseWriter, r *http.Reque
 	// Pass the updated movie record to our new Update() method.
 	err = app.models.EdToys.Update(edToys)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
+
 	// Write the updated movie record in a JSON response.
 	err = app.writeJSON(w, http.StatusOK, envelope{"educational_toys": edToys}, nil)
 	if err != nil {

@@ -2,6 +2,7 @@ package data
 
 import (
 	"Project/internal/validator" // New import
+	"context"
 	"database/sql"
 	"errors"
 	"github.com/lib/pq"
@@ -48,7 +49,10 @@ func (m EdtoysModel) Insert(edtoys *Edtoys) error {
 
 	args := []interface{}{edtoys.Title, edtoys.Year, edtoys.TargetAge, pq.Array(edtoys.Genres), pq.Array(edtoys.SkillFocus), edtoys.Runtime}
 
-	return m.DB.QueryRow(query, args...).Scan(&edtoys.ID, &edtoys.CreatedAt, &edtoys.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	return m.DB.QueryRowContext(ctx, query, args...).Scan(&edtoys.ID, &edtoys.CreatedAt, &edtoys.Version)
 
 }
 
@@ -59,16 +63,19 @@ func (m EdtoysModel) Get(id int64) (*Edtoys, error) {
 	}
 
 	query := `
-SELECT id, created_at, title, year, target_age,genres, skill_focus,runtime, version
-FROM edtoys
-WHERE id = $1`
+		SELECT id, created_at, title, year, target_age,genres, skill_focus,runtime, version
+		FROM edtoys
+		WHERE id = $1`
 	// Declare a Movie struct to hold the data returned by the query.
 	var edToy Edtoys
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 	// Execute the query using the QueryRow() method, passing in the provided id value
 	// as a placeholder parameter, and scan the response data into the fields of the
 	// Movie struct. Importantly, notice that we need to convert the scan target for the
 	// genres column using the pq.Array() adapter function again.
-	err := m.DB.QueryRow(query, id).Scan(
+	err := m.DB.QueryRowContext(ctx, query, id).Scan(
 		&edToy.ID,
 		&edToy.CreatedAt,
 		&edToy.Title,
@@ -97,7 +104,7 @@ func (m EdtoysModel) Update(edtoys *Edtoys) error {
 	query := `
 UPDATE edtoys
 SET title = $1, year = $2, target_age = $3, genres = $4, skill_focus = $5, runtime = $6, version = version + 1
-WHERE id = $7
+WHERE id = $7 AND version = $8
 RETURNING version`
 	// Create an args slice containing the values for the placeholder parameters.
 	args := []interface{}{
@@ -108,10 +115,23 @@ RETURNING version`
 		pq.Array(edtoys.SkillFocus),
 		edtoys.Runtime,
 		edtoys.ID,
+		edtoys.Version,
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	// Use the QueryRow() method to execute the query, passing in the args slice as a
 	// variadic parameter and scanning the new version value into the movie struct.
-	return m.DB.QueryRow(query, args...).Scan(&edtoys.Version)
+	err := m.DB.QueryRowContext(ctx, query, args...).Scan(&edtoys.Version)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			return err
+		}
+	}
+	return nil
 }
 
 // Add a placeholder method for deleting a specific record from the Edtoyss table.
@@ -123,10 +143,14 @@ func (m EdtoysModel) Delete(id int64) error {
 	query := `
 DELETE FROM edtoys
 WHERE id = $1`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	// Execute the SQL query using the Exec() method, passing in the id variable as
 	// the value for the placeholder parameter. The Exec() method returns a sql.Result
 	// object.
-	result, err := m.DB.Exec(query, id)
+	result, err := m.DB.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
