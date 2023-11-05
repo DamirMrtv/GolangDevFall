@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func (app *application) routes() *httprouter.Router {
+func (app *application) routes() http.Handler {
 	router := httprouter.New()
 	// Convert the notFoundResponse() helper to a http.Handler using the
 	// http.HandlerFunc() adapter, and then set it as the custom error handler for 404
@@ -20,5 +20,5 @@ func (app *application) routes() *httprouter.Router {
 	router.HandlerFunc(http.MethodGet, "/v1/edtoys/:id", app.showEdtoysHandler)
 	router.HandlerFunc(http.MethodPatch, "/v1/edtoys/:id", app.updateEdToysHandler)
 	router.HandlerFunc(http.MethodDelete, "/v1/edtoys/:id", app.deleteEdToysHandler)
-	return router
+	return app.recoverPanic(router)
 }
