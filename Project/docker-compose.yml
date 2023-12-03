@@ -1,0 +1,26 @@
+# Use postgres/example user/password credentials
+version: '3.1'
+
+services:
+
+  project:
+    build: .
+    depends_on:
+      - db
+    environment:
+      GREENLIGHT_DB_DSN: postgres://greenlight:pa55word@db/greenlight?sslmode=disable
+
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: greenlight
+      POSTGRES_DB: greenlight
+      POSTGRES_PASSWORD: pa55word
+
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
